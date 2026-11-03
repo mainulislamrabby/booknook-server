@@ -24,6 +24,7 @@ export async function connectToMongoDB() {
 const mongoClient = await connectToMongoDB();
 const db = mongoClient.db("book_nook");
 const booksCollection = db.collection("books");
+const borrowsCollection = db.collection("borrows");
 
 app.post("/add-book", async (req, res) => {
   const data = req.body;
@@ -41,6 +42,102 @@ app.get("/book/:id", async (req, res) => {
   const result = await booksCollection.findOne({ _id: new ObjectId(id) });
   res.send(result);
 });
+
+// Borrow a book
+app.post("/borrow-book", async (req, res) => {
+  try {
+    const data = req.body;
+
+    if (!data.bookId || !data.bookTitle || !data.userEmail) {
+      return res.status(400).send({ message: "Missing borrow information." });
+    }
+
+    const existingBorrow = await borrowsCollection.findOne({
+      bookId: data.bookId,
+      userEmail: data.userEmail,
+      status: "borrowed",
+    });
+
+    if (existingBorrow) {
+      return res.status(409).send({
+        message: "You have already borrowed this book.",
+      });
+    }
+
+    const borrowDate = new Date();
+    const returnDate = new Date(borrowDate);
+    returnDate.setDate(returnDate.getDate() + 14);
+
+    const borrowData = {
+      bookId: data.bookId,
+      bookTitle: data.bookTitle,
+      bookImage: data.bookImage,
+      userEmail: data.userEmail,
+      borrowDate,
+      returnDate,
+      status: "borrowed",
+    };
+
+    const result = await borrowsCollection.insertOne(borrowData);
+
+    res.status(201).send({
+      message: "Book borrowed successfully.",
+      insertedId: result.insertedId,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).send({ message: "Failed to borrow book." });
+  }
+});
+
+// Get logged-in user's borrowed books
+app.get("/my-borrows/:email", async (req, res) => {
+  try {
+    const { email } = req.params;
+
+    const result = await borrowsCollection
+      .find({ userEmail: email })
+      .sort({ borrowDate: -1 })
+      .toArray();
+
+    res.send(result);
+  } catch (error) {
+    console.error(error);
+    res.status(500).send({ message: "Failed to fetch borrowed books." });
+  }
+});
+
+// Return a book
+app.patch("/return-book/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).send({ message: "Invalid borrow ID." });
+    }
+
+    const result = await borrowsCollection.updateOne(
+      { _id: new ObjectId(id), status: "borrowed" },
+      {
+        $set: {
+          status: "returned",
+          returnedAt: new Date(),
+        },
+      }
+    );
+
+    if (result.matchedCount === 0) {
+      return res.status(404).send({ message: "Borrow record not found." });
+    }
+
+    res.send({ message: "Book returned successfully." });
+  } catch (error) {
+    console.error(error);
+    res.status(500).send({ message: "Failed to return book." });
+  }
+});
+
+
 
 app.get("/", (req, res) => {
   res.send({ message: "Server is running" });
