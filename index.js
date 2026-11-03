@@ -137,7 +137,82 @@ app.patch("/return-book/:id", async (req, res) => {
   }
 });
 
+// GET: Books added by a specific user
+app.get("/my-books/:email", async (req, res) => {
+  try {
+    const { email } = req.params;
 
+    const result = await booksCollection
+      .find({ email })
+      .sort({ addedDate: -1 })
+      .toArray();
+
+    res.send(result);
+  } catch (error) {
+    console.error(error);
+    res.status(500).send({ message: "Failed to fetch your books." });
+  }
+});
+
+// PATCH: Update a book
+app.patch("/book/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { email, ...updatedData } = req.body;
+
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).send({ message: "Invalid book ID." });
+    }
+
+    if (!email) {
+      return res.status(400).send({ message: "Email is required." });
+    }
+
+    const result = await booksCollection.updateOne(
+      { _id: new ObjectId(id), email },
+      { $set: updatedData }
+    );
+
+    if (result.matchedCount === 0) {
+      return res.status(404).send({ message: "Book not found." });
+    }
+
+    res.send({ message: "Book updated successfully." });
+  } catch (error) {
+    console.error(error);
+    res.status(500).send({ message: "Failed to update book." });
+  }
+});
+
+// DELETE: Delete a book
+app.delete("/book/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { email } = req.body;
+
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).send({ message: "Invalid book ID." });
+    }
+
+    if (!email) {
+      return res.status(400).send({ message: "Email is required." });
+    }
+
+    const result = await booksCollection.deleteOne({
+      _id: new ObjectId(id),
+      email,
+    });
+
+    if (result.deletedCount === 0) {
+      return res.status(404).send({ message: "Book not found." });
+    }
+
+    res.send({ message: "Book deleted successfully." });
+  } catch (error) {
+    console.error(error);
+    res.status(500).send({ message: "Failed to delete book." });
+  }
+});
 
 app.get("/", (req, res) => {
   res.send({ message: "Server is running" });
