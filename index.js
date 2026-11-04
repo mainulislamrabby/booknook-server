@@ -60,6 +60,16 @@ app.get("/all-books", async (req, res) => {
   res.send(result);
 });
 
+app.get("/new-arrivals", async (req, res) => {
+  const result = await booksCollection
+    .find()
+    .sort({ addedDate: -1 })
+    .limit(6)
+    .toArray();
+
+  res.send(result);
+});
+
 app.get("/book/:id", verifyToken, async (req, res) => {
   const { id } = req.params;
   const result = await booksCollection.findOne({ _id: new ObjectId(id) });
