@@ -26,6 +26,15 @@ const db = mongoClient.db("book_nook");
 const booksCollection = db.collection("books");
 const borrowsCollection = db.collection("borrows");
 
+const verifyApi = (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  if (authHeader !== `Bearer user log in`) {
+    return res.status(401).send({ message: "Unauthorized access" });
+  }
+  console.log("API verified");
+  next();
+};
+
 app.post("/add-book", async (req, res) => {
   const data = req.body;
   const result = await booksCollection.insertOne(data);
@@ -33,12 +42,12 @@ app.post("/add-book", async (req, res) => {
 });
 
 app.get("/all-books", async (req, res) => {
-    const result = await booksCollection.find({}).toArray();
-    res.send(result);
+  const result = await booksCollection.find({}).toArray();
+  res.send(result);
 });
 
-app.get("/book/:id", async (req, res) => {
-  const {id} = req.params;
+app.get("/book/:id", verifyApi, async (req, res) => {
+  const { id } = req.params;
   const result = await booksCollection.findOne({ _id: new ObjectId(id) });
   res.send(result);
 });
@@ -123,7 +132,7 @@ app.patch("/return-book/:id", async (req, res) => {
           status: "returned",
           returnedAt: new Date(),
         },
-      }
+      },
     );
 
     if (result.matchedCount === 0) {
@@ -170,7 +179,7 @@ app.patch("/book/:id", async (req, res) => {
 
     const result = await booksCollection.updateOne(
       { _id: new ObjectId(id), email },
-      { $set: updatedData }
+      { $set: updatedData },
     );
 
     if (result.matchedCount === 0) {
