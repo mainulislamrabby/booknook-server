@@ -49,7 +49,7 @@ const verifyToken = async (req, res, next) => {
   }
 };
 
-app.post("/add-book", async (req, res) => {
+app.post("/add-book", verifyToken, async (req, res) => {
   const data = req.body;
   const result = await booksCollection.insertOne(data);
   res.send(result);
