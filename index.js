@@ -2,6 +2,7 @@ import express from "express";
 import { MongoClient, ObjectId } from "mongodb";
 import "dotenv/config";
 import cors from "cors";
+import { createRemoteJWKSet, jwtVerify } from "jose";
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -26,13 +27,26 @@ const db = mongoClient.db("book_nook");
 const booksCollection = db.collection("books");
 const borrowsCollection = db.collection("borrows");
 
-const verifyApi = (req, res, next) => {
+const verifyToken = async (req, res, next) => {
   const authHeader = req.headers.authorization;
-  if (authHeader !== `Bearer user log in`) {
+  if (!authHeader) {
     return res.status(401).send({ message: "Unauthorized access" });
   }
-  console.log("API verified");
-  next();
+  const token = authHeader.split(" ")[1];
+  if (!token) {
+    return res.status(401).send({ message: "Unauthorized access" });
+  }
+
+  const JWKS = createRemoteJWKSet(
+    new URL("http://localhost:3000/api/auth/jwks"),
+  );
+
+  try {
+    const { payload } = await jwtVerify(token, JWKS);
+    next();
+  } catch (error) {
+    return res.status(401).send({ message: "Unauthorized access" });
+  }
 };
 
 app.post("/add-book", async (req, res) => {
@@ -46,7 +60,7 @@ app.get("/all-books", async (req, res) => {
   res.send(result);
 });
 
-app.get("/book/:id", verifyApi, async (req, res) => {
+app.get("/book/:id", verifyToken, async (req, res) => {
   const { id } = req.params;
   const result = await booksCollection.findOne({ _id: new ObjectId(id) });
   res.send(result);
