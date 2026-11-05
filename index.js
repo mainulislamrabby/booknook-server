@@ -108,16 +108,23 @@ app.post("/borrow-book", verifyToken, async (req, res) => {
     });
   }
 
-  if (book.totalCopies <= 0) {
+  const copyUpdate = await booksCollection.updateOne(
+    {
+      _id: new ObjectId(data.bookId),
+      totalCopies: { $gt: 0 },
+    },
+    {
+      $inc: {
+        totalCopies: -1,
+      },
+    },
+  );
+
+  if (copyUpdate.matchedCount === 0) {
     return res.status(400).send({
       message: "This book is not available.",
     });
   }
-
-  await booksCollection.updateOne(
-    { _id: new ObjectId(data.bookId) },
-    { $inc: { totalCopies: -1 } },
-  );
 
   const borrowDate = new Date();
 
