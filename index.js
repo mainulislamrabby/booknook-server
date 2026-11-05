@@ -170,8 +170,8 @@ app.patch("/return-book/:id", async (req, res) => {
   }
 });
 
-// GET: Books added by a specific user
-app.get("/my-books/:email", async (req, res) => {
+// my-books
+app.get("/my-books/:email", verifyToken, async (req, res) => {
   try {
     const { email } = req.params;
 
