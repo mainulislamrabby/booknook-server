@@ -123,8 +123,8 @@ app.post("/borrow-book", async (req, res) => {
   }
 });
 
-// Get logged-in user's borrowed books
-app.get("/my-borrows/:email", async (req, res) => {
+// my-borrows 
+app.get("/my-borrows/:email", verifyToken, async (req, res) => {
   try {
     const { email } = req.params;
 
@@ -141,7 +141,7 @@ app.get("/my-borrows/:email", async (req, res) => {
 });
 
 // Return a book
-app.patch("/return-book/:id", async (req, res) => {
+app.patch("/return-book/:id", verifyToken, async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -188,7 +188,7 @@ app.get("/my-books/:email", verifyToken, async (req, res) => {
 });
 
 // PATCH: Update a book
-app.patch("/book/:id", async (req, res) => {
+app.patch("/book/:id", verifyToken, async (req, res) => {
   try {
     const { id } = req.params;
     const { email, ...updatedData } = req.body;
@@ -218,7 +218,7 @@ app.patch("/book/:id", async (req, res) => {
 });
 
 // DELETE: Delete a book
-app.delete("/book/:id", async (req, res) => {
+app.delete("/book/:id", verifyToken, async (req, res) => {
   try {
     const { id } = req.params;
     const { email } = req.body;
