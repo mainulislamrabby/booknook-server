@@ -77,53 +77,72 @@ app.get("/book/:id", verifyToken, async (req, res) => {
 });
 
 // Borrow a book
-app.post("/borrow-book", async (req, res) => {
-  try {
-    const data = req.body;
+app.post("/borrow-book", verifyToken, async (req, res) => {
+  const data = req.body;
 
-    if (!data.bookId || !data.bookTitle || !data.userEmail) {
-      return res.status(400).send({ message: "Missing borrow information." });
-    }
-
-    const existingBorrow = await borrowsCollection.findOne({
-      bookId: data.bookId,
-      userEmail: data.userEmail,
-      status: "borrowed",
+  if (!data.bookId || !data.bookTitle || !data.userEmail) {
+    return res.status(400).send({
+      message: "Missing borrow information.",
     });
-
-    if (existingBorrow) {
-      return res.status(409).send({
-        message: "You have already borrowed this book.",
-      });
-    }
-
-    const borrowDate = new Date();
-    const returnDate = new Date(borrowDate);
-    returnDate.setDate(returnDate.getDate() + 14);
-
-    const borrowData = {
-      bookId: data.bookId,
-      bookTitle: data.bookTitle,
-      bookImage: data.bookImage,
-      userEmail: data.userEmail,
-      borrowDate,
-      returnDate,
-      status: "borrowed",
-    };
-
-    const result = await borrowsCollection.insertOne(borrowData);
-
-    res.status(201).send({
-      message: "Book borrowed successfully.",
-      insertedId: result.insertedId,
-    });
-  } catch (error) {
-    console.error(error);
-    res.status(500).send({ message: "Failed to borrow book." });
   }
+
+  const existingBorrow = await borrowsCollection.findOne({
+    bookId: data.bookId,
+    userEmail: data.userEmail,
+    status: "borrowed",
+  });
+
+  if (existingBorrow) {
+    return res.status(409).send({
+      message: "You have already borrowed this book.",
+    });
+  }
+
+  const book = await booksCollection.findOne({
+    _id: new ObjectId(data.bookId),
+  });
+
+  if (!book) {
+    return res.status(404).send({
+      message: "Book not found.",
+    });
+  }
+
+  if (book.totalCopies <= 0) {
+    return res.status(400).send({
+      message: "This book is not available.",
+    });
+  }
+
+  await booksCollection.updateOne(
+    { _id: new ObjectId(data.bookId) },
+    { $inc: { totalCopies: -1 } },
+  );
+
+  const borrowDate = new Date();
+
+  const returnDate = new Date(borrowDate);
+  returnDate.setDate(returnDate.getDate() + 14);
+
+  const borrowData = {
+    bookId: data.bookId,
+    bookTitle: data.bookTitle,
+    bookImage: data.bookImage,
+    userEmail: data.userEmail,
+    borrowDate,
+    returnDate,
+    status: "borrowed",
+  };
+
+  const result = await borrowsCollection.insertOne(borrowData);
+
+  res.status(201).send({
+    message: "Book borrowed successfully.",
+    insertedId: result.insertedId,
+  });
 });
 
-// my-borrows 
+// my-borrows
 app.get("/my-borrows/:email", verifyToken, async (req, res) => {
   try {
     const { email } = req.params;
@@ -142,32 +161,43 @@ app.get("/my-borrows/:email", verifyToken, async (req, res) => {
 
 // Return a book
 app.patch("/return-book/:id", verifyToken, async (req, res) => {
-  try {
-    const { id } = req.params;
+  const { id } = req.params;
 
-    if (!ObjectId.isValid(id)) {
-      return res.status(400).send({ message: "Invalid borrow ID." });
-    }
-
-    const result = await borrowsCollection.updateOne(
-      { _id: new ObjectId(id), status: "borrowed" },
-      {
-        $set: {
-          status: "returned",
-          returnedAt: new Date(),
-        },
-      },
-    );
-
-    if (result.matchedCount === 0) {
-      return res.status(404).send({ message: "Borrow record not found." });
-    }
-
-    res.send({ message: "Book returned successfully." });
-  } catch (error) {
-    console.error(error);
-    res.status(500).send({ message: "Failed to return book." });
+  if (!ObjectId.isValid(id)) {
+    return res.status(400).send({
+      message: "Invalid borrow ID.",
+    });
   }
+
+  const borrow = await borrowsCollection.findOne({
+    _id: new ObjectId(id),
+    status: "borrowed",
+  });
+
+  if (!borrow) {
+    return res.status(404).send({
+      message: "Borrow record not found.",
+    });
+  }
+
+  await borrowsCollection.updateOne(
+    { _id: new ObjectId(id) },
+    {
+      $set: {
+        status: "returned",
+        returnedAt: new Date(),
+      },
+    },
+  );
+
+  await booksCollection.updateOne(
+    { _id: new ObjectId(borrow.bookId) },
+    { $inc: { totalCopies: 1 } },
+  );
+
+  res.send({
+    message: "Book returned successfully.",
+  });
 });
 
 // my-books
